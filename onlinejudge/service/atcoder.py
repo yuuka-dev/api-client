@@ -92,6 +92,25 @@ class AtCoderService(onlinejudge.type.Service):
             logger.error('Username or Password is incorrect.')
             raise LoginError
 
+    def login_with_cookie(self, revel_session: str, *, session: Optional[requests.Session] = None) -> None:
+        """
+        Login using a REVEL_SESSION cookie value directly.
+
+        This is an alternative to :py:meth:`login` for cases where Cloudflare CAPTCHA
+        blocks automated username/password login (introduced on AtCoder in March 2025).
+        Obtain the cookie value from your browser's DevTools after logging in manually:
+        Application > Cookies > https://atcoder.jp > REVEL_SESSION
+
+        :param revel_session: the value of the REVEL_SESSION cookie
+        :raises LoginError:
+        """
+
+        session = session or utils.get_default_session()
+        session.cookies.set('REVEL_SESSION', revel_session, domain='atcoder.jp')
+        if not self.is_logged_in(session=session):
+            raise LoginError('REVEL_SESSION cookie is invalid or expired')
+        logger.info('Welcome,')
+
     def get_url_of_login_page(self) -> str:
         return 'https://atcoder.jp/login'
 
@@ -545,9 +564,13 @@ class AtCoderProblemData(ProblemData):
         if tds[3].text.endswith(' KB'):
             memory_limit_byte = int(float(utils.remove_suffix(tds[3].text, ' KB')) * 1000)
         elif tds[3].text.endswith(' MB'):
-            memory_limit_byte = int(float(utils.remove_suffix(tds[3].text, ' MB')) * 1000 * 1000)  # TODO: confirm this is MB truly, not MiB
+            memory_limit_byte = int(float(utils.remove_suffix(tds[3].text, ' MB')) * 1000 * 1000)
+        elif tds[3].text.endswith(' KiB'):
+            memory_limit_byte = int(float(utils.remove_suffix(tds[3].text, ' KiB')) * 1024)
+        elif tds[3].text.endswith(' MiB'):
+            memory_limit_byte = int(float(utils.remove_suffix(tds[3].text, ' MiB')) * 1024 * 1024)
         else:
-            assert False
+            raise ValueError('unrecognized memory limit format: {!r}'.format(tds[3].text))
         if len(tds) == 5:
             assert tds[4].text.strip() in ('', 'Submit', '提出')
 
@@ -574,17 +597,19 @@ class AtCoderProblemData(ProblemData):
             if time_limit.startswith(time_limit_prefix):
                 break
         else:
-            assert False
+            raise SampleParseError('unrecognized time limit prefix: {!r}'.format(time_limit))
         if time_limit.endswith(' msec'):
             time_limit_msec = int(utils.remove_suffix(utils.remove_prefix(time_limit, time_limit_prefix), ' msec'))
         elif time_limit.endswith(' sec'):
             time_limit_msec = int(float(utils.remove_suffix(utils.remove_prefix(time_limit, time_limit_prefix), ' sec')) * 1000)
         else:
-            assert False
+            raise SampleParseError('unrecognized time limit suffix: {!r}'.format(time_limit))
 
         # When login as the admin, a link is added after memory limit. See https://github.com/online-judge-tools/api-client/issues/90
-        parsed_memory_limit = re.search(r'^(メモリ制限|Memory Limit): ([0-9.]+) (KB|MB)', memory_limit)
-        assert parsed_memory_limit
+        # AtCoder changed units from MB/KB to MiB/KiB (IEC binary prefixes) around 2025
+        parsed_memory_limit = re.search(r'^(メモリ制限|Memory Limit): ([0-9.]+) (KB|MB|KiB|MiB)', memory_limit)
+        if not parsed_memory_limit:
+            raise SampleParseError('unrecognized memory limit format: {!r}'.format(memory_limit))
 
         memory_limit_value = parsed_memory_limit.group(2)
         memory_limit_unit = parsed_memory_limit.group(3)
@@ -592,8 +617,12 @@ class AtCoderProblemData(ProblemData):
             memory_limit_byte = int(float(memory_limit_value) * 1000)
         elif memory_limit_unit == 'MB':
             memory_limit_byte = int(float(memory_limit_value) * 1000 * 1000)
+        elif memory_limit_unit == 'KiB':
+            memory_limit_byte = int(float(memory_limit_value) * 1024)
+        elif memory_limit_unit == 'MiB':
+            memory_limit_byte = int(float(memory_limit_value) * 1024 * 1024)
         else:
-            assert False
+            raise SampleParseError('unrecognized memory limit unit: {!r}'.format(memory_limit_unit))
 
         return AtCoderProblemData(
             alphabet=alphabet,
