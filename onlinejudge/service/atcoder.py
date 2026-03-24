@@ -565,7 +565,7 @@ class AtCoderProblemData(ProblemData):
     @classmethod
     def _from_table_row(cls, tr: bs4.Tag, *, session: requests.Session, response: requests.Response, timestamp: datetime.datetime) -> 'AtCoderProblemData':
         tds = tr.find_all('td')
-        if not (4 <= len(tds) <= 5):
+        if not 4 <= len(tds) <= 5:
             raise ValueError('unexpected number of <td> tags in task list row: {}'.format(len(tds)))
         a_tag = tds[1].find('a')
         if a_tag is None:

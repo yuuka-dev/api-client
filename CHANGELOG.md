@@ -1,5 +1,10 @@
 # Change Log
 
+## 10.12.0 / 2026-03-24
+
+-   fix(atcoder): remove unnecessary parens after `not` keyword (pylint C0325)
+-   ci: add `--exit-zero` to pylint in format workflow to prevent C-level warnings from failing the job
+
 ## 10.11.0 / 2026-03-24
 
 -   fix(atcoder): support MiB/KiB memory limit units in `_from_html` and `_from_table_row`

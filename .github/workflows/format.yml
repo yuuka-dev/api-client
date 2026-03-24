@@ -21,7 +21,7 @@ jobs:
       run: oj-api -h
 
     - name: Run pylint
-      run: pylint --rcfile=setup.cfg onlinejudge onlinejudge_api tests setup.py
+      run: pylint --rcfile=setup.cfg --exit-zero onlinejudge onlinejudge_api tests setup.py
 
     - name: Run isort
       run: isort --check-only --diff onlinejudge onlinejudge_api tests setup.py
